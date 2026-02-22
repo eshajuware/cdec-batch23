@@ -14,8 +14,8 @@ pipeline {
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
         SONAR_HOST_URL = 'http://your-sonarqube-server:9000'
         SONAR_TOKEN = credentials('sonar-token')
-        DOCKER_USERNAME = credentials('docker-username')
-        DOCKER_PASSWORD = credentials('docker-password')
+        DOCKER_USERNAME = credentials('eshajuware2227@gmail.cm')
+        DOCKER_PASSWORD = credentials('Esha@1234')
         KUBE_CONFIG = credentials('kubeconfig') // if using kubeconfig as secret
     }
 
@@ -24,7 +24,7 @@ pipeline {
         // Stage 1: Checkout code
         stage('PULL') {
             steps {
-                git branch: 'main', url: 'https://github.com/yourrepo.git'
+                git branch: 'master', url: 'https://github.com/eshajuware/cdec-batch23.git'
             }
         }
 
