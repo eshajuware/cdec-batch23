@@ -9,13 +9,13 @@ pipeline {
 
     // 2️⃣ Environment variables & credentials
     environment {
-        DOCKER_REGISTRY = 'docker.io'  // or your private registry
+        DOCKER_REGISTRY = 'docker.io'                 // DockerHub registry
         DOCKER_IMAGE_NAME = 'flight-reservation-app'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
         SONAR_HOST_URL = 'http://your-sonarqube-server:9000'
-        SONAR_TOKEN = credentials('sonar-token')         // SonarQube token in Jenkins
-        DOCKER_USERNAME = credentials('docker-cred')     // DockerHub credential ID
-        KUBE_CONFIG = credentials('kubeconfig')          // kubeconfig file credential ID
+        SONAR_TOKEN = credentials('sonar-cred')      // SonarQube token credential ID
+        DOCKER_USERNAME = credentials('docker-cred') // DockerHub username/password credential ID
+        KUBE_CONFIG = credentials('kubeconfig')      // kubeconfig file credential ID
     }
 
     stages {
