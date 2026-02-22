@@ -9,14 +9,13 @@ pipeline {
 
     // 2️⃣ Environment variables & credentials
     environment {
-        DOCKER_REGISTRY = 'your-docker-registry'
+        DOCKER_REGISTRY = 'docker.io'  // or your private registry
         DOCKER_IMAGE_NAME = 'flight-reservation-app'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
         SONAR_HOST_URL = 'http://your-sonarqube-server:9000'
-        SONAR_TOKEN = credentials('sonar-token')
-        DOCKER_USERNAME = credentials('eshajuware2227@gmail.cm')
-        DOCKER_PASSWORD = credentials('Esha@1234')
-        KUBE_CONFIG = credentials('kubeconfig') // if using kubeconfig as secret
+        SONAR_TOKEN = credentials('sonar-token')         // SonarQube token in Jenkins
+        DOCKER_USERNAME = credentials('docker-cred')     // DockerHub credential ID
+        KUBE_CONFIG = credentials('kubeconfig')          // kubeconfig file credential ID
     }
 
     stages {
@@ -35,7 +34,7 @@ pipeline {
             }
         }
 
-        // Stage 3: QA Test (run unit tests and coverage)
+        // Stage 3: Run unit tests and coverage
         stage('QA Test') {
             steps {
                 sh "mvn test"
@@ -72,8 +71,10 @@ pipeline {
         // Stage 7: Docker Push
         stage('DOCKER PUSH') {
             steps {
-                sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin ${DOCKER_REGISTRY}"
-                sh "docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+                sh """
+                    echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin $DOCKER_REGISTRY
+                    docker push $DOCKER_REGISTRY/$DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+                """
             }
         }
 
@@ -87,5 +88,14 @@ pipeline {
             }
         }
 
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully! 🎉"
+        }
+        failure {
+            echo "Pipeline failed. Check the logs for errors. ❌"
+        }
     }
 }
