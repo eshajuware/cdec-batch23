@@ -1,58 +1,58 @@
 pipeline {
     agent any
 
-    // 1️⃣ Tools installed on Jenkins
     tools {
-        jdk 'JDK21'       // exact name from Global Tool Config
-        maven 'Maven3'    // exact name from Global Tool Config
+        jdk 'JDK21'
+        maven 'Maven3'
     }
 
-    // 2️⃣ Environment variables & credentials
     environment {
-        DOCKER_REGISTRY = 'docker.io'                 // DockerHub registry
+        DOCKER_REGISTRY = 'docker.io'
         DOCKER_IMAGE_NAME = 'flight-reservation-app'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
         SONAR_HOST_URL = 'http://your-sonarqube-server:9000'
-        SONAR_TOKEN = credentials('sonar-cred')      // SonarQube token credential ID
-        DOCKER_USERNAME = credentials('docker-cred') // DockerHub username/password credential ID
-        KUBE_CONFIG = credentials('kubeconfig')      // kubeconfig file credential ID
+        SONAR_TOKEN = credentials('sonar-cred')
+        DOCKER_USERNAME = credentials('docker-cred')
+        KUBE_CONFIG = credentials('kubeconfig')
     }
 
     stages {
 
-        // Stage 1: Checkout code
         stage('PULL') {
             steps {
                 git branch: 'master', url: 'https://github.com/eshajuware/cdec-batch23.git'
             }
         }
 
-        // Stage 2: Build with Maven (skip tests)
         stage('BUILD') {
             steps {
-                sh "mvn clean package -DskipTests"
-            }
-        }
-
-        // Stage 3: Run unit tests and coverage
-        stage('QA Test') {
-            steps {
-                sh "mvn test"
-                junit '**/target/surefire-reports/*.xml'
-                jacoco execPattern: '**/target/jacoco.exec', classPattern: '**/target/classes', sourcePattern: '**/src/main/java'
-            }
-        }
-
-        // Stage 4: SonarQube Analysis
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh "mvn sonar:sonar -Dsonar.projectKey=flight-reservation-app"
+                // Change directory to backend where pom.xml exists
+                dir('backend') {
+                    sh "mvn clean package -DskipTests"
                 }
             }
         }
 
-        // Stage 5: Quality Gate
+        stage('QA Test') {
+            steps {
+                dir('backend') {
+                    sh "mvn test"
+                    junit '**/target/surefire-reports/*.xml'
+                    jacoco execPattern: '**/target/jacoco.exec', classPattern: '**/target/classes', sourcePattern: '**/src/main/java'
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('backend') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh "mvn sonar:sonar -Dsonar.projectKey=flight-reservation-app"
+                    }
+                }
+            }
+        }
+
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -61,14 +61,14 @@ pipeline {
             }
         }
 
-        // Stage 6: Docker Build
         stage('DOCKER BUILD') {
             steps {
-                sh "docker build -t ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+                dir('backend') {
+                    sh "docker build -t ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+                }
             }
         }
 
-        // Stage 7: Docker Push
         stage('DOCKER PUSH') {
             steps {
                 sh """
@@ -78,11 +78,10 @@ pipeline {
             }
         }
 
-        // Stage 8: Deploy to Kubernetes
         stage('DEPLOY') {
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh "kubectl apply -f k8s/deployment.yml"
+                    sh "kubectl apply -f backend/k8s/deployment.yml"
                     sh "kubectl set image deployment/flight-deployment flight-container=${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
                 }
             }
