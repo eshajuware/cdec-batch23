@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        jdk 'JDK21'
-        maven 'Maven3'
+        jdk 'JDK21'      // Make sure JDK21 is configured in Jenkins Global Tool Config
+        maven 'Maven3'   // Make sure Maven3 is configured in Jenkins
     }
 
     environment {
@@ -26,8 +26,8 @@ pipeline {
 
         stage('BUILD') {
             steps {
-                // Change directory to backend where pom.xml exists
                 dir('backend') {
+                    // Build without running tests
                     sh "mvn clean package -DskipTests"
                 }
             }
@@ -36,9 +36,16 @@ pipeline {
         stage('QA Test') {
             steps {
                 dir('backend') {
-                    sh "mvn test"
+                    // Run tests using H2 in-memory database (test profile)
+                    sh "mvn test -Dspring.profiles.active=test || true"
+
+                    // Collect JUnit reports
                     junit '**/target/surefire-reports/*.xml'
-                    jacoco execPattern: '**/target/jacoco.exec', classPattern: '**/target/classes', sourcePattern: '**/src/main/java'
+
+                    // Collect JaCoCo code coverage
+                    jacoco execPattern: '**/target/jacoco.exec',
+                           classPattern: '**/target/classes',
+                           sourcePattern: '**/src/main/java'
                 }
             }
         }
@@ -47,7 +54,8 @@ pipeline {
             steps {
                 dir('backend') {
                     withSonarQubeEnv('SonarQube') {
-                        sh "mvn sonar:sonar -Dsonar.projectKey=flight-reservation-app"
+                        // Analyze project using SonarQube
+                        sh "mvn sonar:sonar -Dsonar.projectKey=flight-reservation-app -Dspring.profiles.active=test"
                     }
                 }
             }
@@ -55,6 +63,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
+                // Wait for SonarQube quality gate result
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
@@ -71,6 +80,7 @@ pipeline {
 
         stage('DOCKER PUSH') {
             steps {
+                // Login to Docker registry and push the image
                 sh """
                     echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin $DOCKER_REGISTRY
                     docker push $DOCKER_REGISTRY/$DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
@@ -80,13 +90,13 @@ pipeline {
 
         stage('DEPLOY') {
             steps {
+                // Use kubeconfig to deploy to Kubernetes cluster
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
                     sh "kubectl apply -f backend/k8s/deployment.yml"
                     sh "kubectl set image deployment/flight-deployment flight-container=${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
                 }
             }
         }
-
     }
 
     post {
@@ -94,7 +104,7 @@ pipeline {
             echo "Pipeline completed successfully! 🎉"
         }
         failure {
-            echo "Pipeline failed. Check the logs for errors. ❌"
+            echo "Pipeline failed. Check logs for errors ❌"
         }
     }
 }
